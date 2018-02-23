@@ -17,17 +17,18 @@ func (m *EchoModel) GetName() string {
 	return "Echo"
 }
 
-func (m *EchoModel) Create(createInfo modelmap.Deserializer) interface{} {
+func (m *EchoModel) Create(rc *modelmap.RequestContext, createInfo modelmap.Deserializer) interface{} {
 	var info EchoModelCreateOrUpdateInfo
 	createInfo(&info)
 	return &info
 }
 
-func (m *EchoModel) Read(filter map[string]modelmap.FilterRule) interface{} {
+func (m *EchoModel) Read(rc *modelmap.RequestContext, filter map[string]modelmap.FilterRule) interface{} {
 	return filter
 }
 
 func (m *EchoModel) Update(
+	rc *modelmap.RequestContext,
 	filter map[string]modelmap.FilterRule,
 	updateInfo modelmap.Deserializer,
 ) interface{} {
@@ -40,6 +41,6 @@ func (m *EchoModel) Update(
 	}
 }
 
-func (m *EchoModel) Delete(filter map[string]modelmap.FilterRule) interface{} {
+func (m *EchoModel) Delete(rc *modelmap.RequestContext, filter map[string]modelmap.FilterRule) interface{} {
 	return filter
 }

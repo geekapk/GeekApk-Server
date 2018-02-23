@@ -1,18 +1,31 @@
 package main
 
 import (
+	"os"
 	"net/http"
 	"modelmap"
 	"models"
+	"github.com/jinzhu/gorm"
+	_ "github.com/jinzhu/gorm/dialects/postgres"
 )
 
 func main() {
+	db, err := gorm.Open(
+		os.Getenv("GA_DB_TYPE"),
+		os.Getenv("GA_DB_CONN_STR"),
+	)
+	if err != nil {
+		panic(err)
+	}
+
 	registry := modelmap.NewRegistry()
 
 	// Add models here...
 	registry.AddProvider(&models.EchoModel {})
+	registry.AddProvider(models.NewAccountModel(db))
+	registry.AddProvider(models.NewUserModel(db))
 
-	mux, err := registry.BuildServeMux()
+	mux, err := registry.BuildHandler("very_secret")
 	if err != nil {
 		panic(err)
 	}

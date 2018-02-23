@@ -10,6 +10,8 @@ import (
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
+	"github.com/gorilla/context"
+	"github.com/gorilla/sessions"
 )
 
 type Registry struct {
@@ -48,16 +50,28 @@ func (r *Registry) RemoveProvider(name string) error {
 	return nil
 }
 
-func (r *Registry) BuildServeMux() (*http.ServeMux, error) {
+func (r *Registry) BuildHandler(
+	cookieSecret string,
+) (http.Handler, error) {
 	mux := http.NewServeMux()
 
 	r.Lock()
 	defer r.Unlock()
 
-	for k, provider := range r.providers {
+	sessionStore := sessions.NewCookieStore([]byte(cookieSecret))
+
+	for k, _provider := range r.providers {
 		urlName := transformModelNameToUrlRepr(k)
+		provider := _provider
 		mux.HandleFunc("/" + urlName + "/", func (w http.ResponseWriter, r *http.Request) {
 			var filter map[string]FilterRule = make(map[string]FilterRule)
+
+			session, _ := sessionStore.Get(r, "geekapk")
+			defer session.Save(r, w)
+
+			rc := &RequestContext {
+				Session: session,
+			}
 
 			parseImplicitFilterRules(filter, r.URL)
 
@@ -81,16 +95,16 @@ func (r *Registry) BuildServeMux() (*http.ServeMux, error) {
 
 			switch r.Method {
 			case "GET": // Read
-				ret = provider.Read(filter)
+				ret = provider.Read(rc, filter)
 				break
 			case "PUT": // Update
-				ret = provider.Update(filter, defaultDeserializeFeed(string(body)))
+				ret = provider.Update(rc, filter, defaultDeserializeFeed(string(body)))
 				break
 			case "POST": // Create
-				ret = provider.Create(defaultDeserializeFeed(string(body)))
+				ret = provider.Create(rc, defaultDeserializeFeed(string(body)))
 				break
 			case "DELETE": // Delete
-				ret = provider.Delete(filter)
+				ret = provider.Delete(rc, filter)
 				break
 			default:
 				panic("Unknown HTTP method")
@@ -100,7 +114,7 @@ func (r *Registry) BuildServeMux() (*http.ServeMux, error) {
 		})
 	}
 
-	return mux, nil
+	return context.ClearHandler(mux), nil
 }
 
 func parseImplicitFilterRules(rules map[string]FilterRule, urlInfo *url.URL) {
