@@ -3,12 +3,14 @@ package main
 import (
 	"net/http"
 	"modelmap"
+	"models"
 )
 
 func main() {
 	registry := modelmap.NewRegistry()
 
 	// Add models here...
+	registry.AddProvider(&models.EchoModel {})
 
 	mux, err := registry.BuildServeMux()
 	if err != nil {
