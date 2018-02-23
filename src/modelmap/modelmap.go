@@ -124,8 +124,13 @@ func defaultDeserializeFeed(input string) func(out interface{}) error {
 }
 
 func parseFilterRules(input string) (map[string]FilterRule, error) {
-	parts := strings.Split(input, ";")
 	ret := make(map[string]FilterRule)
+
+	if len(input) == 0 {
+		return ret, nil
+	}
+
+	parts := strings.Split(input, ";")
 
 	for _, p := range parts {
 		operands := strings.Split(p, ",")
