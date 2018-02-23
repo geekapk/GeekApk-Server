@@ -184,6 +184,7 @@ func transformModelNameToUrlRepr(name string) string {
 			ret += string(ch)
 		}
 	}
+	ret += "s"
 
 	return ret
 }
