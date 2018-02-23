@@ -6,6 +6,7 @@ import (
 	"errors"
 	"unicode"
 	"strings"
+	"net/url"
 	"net/http"
 	"io/ioutil"
 	"encoding/json"
@@ -55,56 +56,76 @@ func (r *Registry) BuildServeMux() (*http.ServeMux, error) {
 
 	for k, provider := range r.providers {
 		urlName := transformModelNameToUrlRepr(k)
-		urlPrefix := "/" + urlName + "/"
-		mux.HandleFunc(urlPrefix + "new", func (w http.ResponseWriter, r *http.Request) {
-			rawCreateInfoBytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				panic(err)
-			}
-			defer r.Body.Close()
+		mux.HandleFunc("/" + urlName + "/", func (w http.ResponseWriter, r *http.Request) {
+			var filter map[string]FilterRule = make(map[string]FilterRule)
 
-			ret := provider.Create(defaultDeserializeFeed(string(rawCreateInfoBytes)))
-			marshalAndWrite(w, ret)
-		})
-		mux.HandleFunc(urlPrefix + "get", func (w http.ResponseWriter, r *http.Request) {
-			filter, err := parseFilterRules(r.URL.Query().Get("filter"))
+			parseImplicitFilterRules(filter, r.URL)
+
+			err := parseFilterRules(filter, r.URL.Query().Get("filter"))
 			if err != nil {
 				marshalAndWrite(w, err.Error())
 				return
 			}
 
-			ret := provider.Read(filter)
-			marshalAndWrite(w, ret)
-		})
-		mux.HandleFunc(urlPrefix + "update", func (w http.ResponseWriter, r *http.Request) {
-			rawUpdateInfoBytes, err := ioutil.ReadAll(r.Body)
-			if err != nil {
-				panic(err)
-			}
-			defer r.Body.Close()
+			var body []byte = nil
 
-			filter, err := parseFilterRules(r.URL.Query().Get("filter"))
-			if err != nil {
-				marshalAndWrite(w, err.Error())
-				return
+			if r.Method == "PUT" || r.Method == "POST" {
+				body, err = ioutil.ReadAll(r.Body)
+				if err != nil {
+					panic(err)
+				}
+				defer r.Body.Close()
 			}
 
-			ret := provider.Update(filter, defaultDeserializeFeed(string(rawUpdateInfoBytes)))
-			marshalAndWrite(w, ret)
-		})
-		mux.HandleFunc(urlPrefix + "remove", func (w http.ResponseWriter, r *http.Request) {
-			filter, err := parseFilterRules(r.URL.Query().Get("filter"))
-			if err != nil {
-				marshalAndWrite(w, err.Error())
-				return
+			var ret interface{} = nil
+
+			switch r.Method {
+			case "GET": // Read
+				ret = provider.Read(filter)
+				break
+			case "PUT": // Update
+				ret = provider.Update(filter, defaultDeserializeFeed(string(body)))
+				break
+			case "POST": // Create
+				ret = provider.Create(defaultDeserializeFeed(string(body)))
+				break
+			case "DELETE": // Delete
+				ret = provider.Delete(filter)
+				break
+			default:
+				panic("Unknown HTTP method")
 			}
 
-			ret := provider.Delete(filter)
 			marshalAndWrite(w, ret)
 		})
 	}
 
 	return mux, nil
+}
+
+func parseImplicitFilterRules(rules map[string]FilterRule, urlInfo *url.URL) {
+	path := strings.Split(urlInfo.EscapedPath(), "/")
+
+	if len(path) >= 3 {
+		v, err := url.PathUnescape(path[2])
+		if err == nil {
+			rules["id"] = FilterRule {
+				Key: "id",
+				CompareType: CmpEq,
+				Value: v,
+			}
+		}
+	}
+	if len(path) >= 4 {
+		v, err := url.PathUnescape(path[3])
+		if err == nil {
+			rules["property"] = FilterRule {
+				Key: "property",
+				CompareType: CmpEq,
+				Value: v,
+			}
+		}
+	}
 }
 
 func marshalAndWrite(w http.ResponseWriter, data interface{}) {
@@ -123,11 +144,9 @@ func defaultDeserializeFeed(input string) func(out interface{}) error {
 	}
 }
 
-func parseFilterRules(input string) (map[string]FilterRule, error) {
-	ret := make(map[string]FilterRule)
-
+func parseFilterRules(rules map[string]FilterRule, input string) error {
 	if len(input) == 0 {
-		return ret, nil
+		return nil
 	}
 
 	parts := strings.Split(input, ";")
@@ -135,7 +154,7 @@ func parseFilterRules(input string) (map[string]FilterRule, error) {
 	for _, p := range parts {
 		operands := strings.Split(p, ",")
 		if len(operands) != 3 {
-			return nil, errors.New("Expecting exactly 3 operands for filter rule")
+			return errors.New("Expecting exactly 3 operands for filter rule")
 		}
 		cmpType := CmpUnknown
 		switch operands[1] {
@@ -158,16 +177,16 @@ func parseFilterRules(input string) (map[string]FilterRule, error) {
 			cmpType = CmpLe
 			break
 		default:
-			return nil, errors.New("Expecting one of eq, ne, gt, ge, lt, le")
+			return errors.New("Expecting one of eq, ne, gt, ge, lt, le")
 		}
-		ret[operands[0]] = FilterRule {
+		rules[operands[0]] = FilterRule {
 			Key: operands[0],
 			CompareType: cmpType,
 			Value: operands[2],
 		}
 	}
 
-	return ret, nil
+	return nil
 }
 
 func transformModelNameToUrlRepr(name string) string {
