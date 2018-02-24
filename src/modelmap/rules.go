@@ -63,8 +63,11 @@ func parseFilterRules(rules map[string]FilterRule, input string) error {
 		case "le":
 			cmpType = CmpLe
 			break
+		case "like":
+			cmpType = CmpLike
+			break
 		default:
-			return errors.New("Expecting one of eq, ne, gt, ge, lt, le")
+			return errors.New("Expecting one of eq, ne, gt, ge, lt, le, like")
 		}
 		rules[operands[0]] = FilterRule {
 			Key: operands[0],
