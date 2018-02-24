@@ -97,7 +97,7 @@ func (m *UserModel) Create(rc *modelmap.RequestContext, loadCreateInfo modelmap.
 		m.db.Delete(&acc)
 		return "Duplicated email address"
 	}
-	return "User created"
+	return "OK"
 }
 
 func (m *UserModel) Read(rc *modelmap.RequestContext, filter map[string]modelmap.FilterRule) interface{} {
@@ -134,11 +134,50 @@ func (m *UserModel) Read(rc *modelmap.RequestContext, filter map[string]modelmap
 	}
 }
 
+type UserLoginRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+}
+
 func (m *UserModel) Update(
 	rc *modelmap.RequestContext,
 	filter map[string]modelmap.FilterRule,
 	loadUpdateInfo modelmap.Deserializer,
 ) interface{} {
+	prop := filter["property"]
+	if prop.CompareType == modelmap.CmpEq && prop.Value == "login" {
+		var req UserLoginRequest
+		loadUpdateInfo(&req)
+
+		if !checkBasicString(req.Username) || !checkBasicString(req.Password) {
+			return "Illegal input"
+		}
+
+		var u User
+		var acc Account
+		err := m.db.Where("name = ?", req.Username).First(&acc).Error
+		if err != nil {
+			return "User not found"
+		}
+
+		err = m.db.Where("id = ?", acc.Id).First(&u).Error
+		if err != nil {
+			return "The requested account is not a user"
+		}
+
+		hash, err := base64.StdEncoding.DecodeString(u.Password)
+		if err != nil {
+			panic(err)
+		}
+
+		err = bcrypt.CompareHashAndPassword(hash, []byte(req.Password))
+		if err != nil {
+			return "Incorrect password"
+		}
+
+		rc.Session.Values["uid"] = u.Id
+		return "OK"
+	}
 	return "Not implemented"
 }
 

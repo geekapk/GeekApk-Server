@@ -18,6 +18,11 @@ func main() {
 		panic(err)
 	}
 
+	secret := os.Getenv("GA_SECRET")
+	if len(secret) == 0 {
+		panic("GA_SECRET required")
+	}
+
 	registry := modelmap.NewRegistry()
 
 	// Add models here...
@@ -25,7 +30,7 @@ func main() {
 	registry.AddProvider(models.NewAccountModel(db))
 	registry.AddProvider(models.NewUserModel(db))
 
-	mux, err := registry.BuildHandler("very_secret")
+	mux, err := registry.BuildHandler(secret)
 	if err != nil {
 		panic(err)
 	}
