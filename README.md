@@ -7,11 +7,7 @@ git clone https://github.com/geekapk/GeekApk-Server
 cd GeekApk-Server
 export GOPATH=`pwd`
 
-rm -rf src/github.com src/golang.org
-
-go get github.com/gorilla/context github.com/gorilla/securecookie github.com/gorilla/sessions github.com/jinzhu/gorm github.com/jinzhu/inflection github.com/lib/pq github.com/satori/go.uuid
-
-go get golang.org/x/crypto
+go get ...
 
 ```
 
@@ -21,5 +17,6 @@ go get golang.org/x/crypto
 go run launcher
 ```
 
+## Package management
 
-I think maybe `vendor` is better than full gopath
+Currently we just use the repository root as GOPATH and put the server code in src/ to keep things simple. Feel free to open an issue if you've got a better dependency management strategy!
