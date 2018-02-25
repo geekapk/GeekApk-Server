@@ -14,7 +14,7 @@ go get ...
 ## Start
 
 ```shell
-go run launch
+go run launch.go
 ```
 
 ## Package management
